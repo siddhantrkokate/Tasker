@@ -1,0 +1,66 @@
+import requests
+import json
+import os
+
+def load_api_keys():
+    """Load API keys from config file."""
+    config_file = "api_keys.txt"
+    keys = {
+        'blackbox_api_key': '',
+        'gemini_api_key': '',
+        'krutrim_api_key': ''
+    }
+    
+    # Check parent directory for api_keys.txt (since this is in modules/)
+    if not os.path.exists(config_file):
+        config_file = os.path.join("..", "api_keys.txt")
+    if not os.path.exists(config_file):
+        config_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), "api_keys.txt")
+    
+    if os.path.exists(config_file):
+        with open(config_file, 'r') as f:
+            for line in f:
+                line = line.strip()
+                if '=' in line:
+                    key, value = line.split('=', 1)
+                    keys[key.strip()] = value.strip()
+    
+    return keys
+
+def generate_text(text):
+    keys = load_api_keys()
+    api_key = keys.get('krutrim_api_key', '')
+    
+    if not api_key:
+        return "Error: Krutrim API key not configured. Please run setup_api_keys() first."
+    
+    model_name = "Llama-3.3-70B-Instruct"
+    messages = [
+        {"role": "user", "content": text}
+    ]
+    url = "https://cloud.olakrutrim.com/v1/chat/completions"
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {api_key}"
+    }
+    data = {
+        "model": model_name,
+        "messages": messages,
+        "frequency_penalty": 0,
+        "logprobs": True,
+        "top_logprobs": 2,
+        "max_tokens": 5000,
+        "n": 1,
+        "presence_penalty": 0,
+        "response_format": {"type": "text"},
+        "stream": False,
+        "temperature": 0,
+        "top_p": 1
+    }
+
+    try:
+        response = requests.post(url, headers=headers, data=json.dumps(data))
+        response.raise_for_status()
+        return response.json()['choices'][0]['message']['content']
+    except requests.exceptions.RequestException as exc:
+        return f"Exception: {exc}"
